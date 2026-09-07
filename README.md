@@ -12,7 +12,7 @@ Use subtle motion: risk scores animate/count up, story-mode plays edges in seque
 Data-dense but never cluttered — use cards, sparklines, badges, and collapsible panels rather than walls of text. Every risk score, pattern tag, and status should be a color-coded badge (Low/Medium/High/Critical).
 Include empty states, loading skeletons, and toast notifications for actions (case created, scenario run, feedback saved).
 Tech & data approach for this build
-Since this is a Lovable prototype, implement it as a single React app with Supabase as the backend/database (use it for transactions, accounts, alerts, cases, scenarios, feedback tables). Seed the database with realistic synthetic data only — no real personal or financial data. Build a seed script/edge function that generates:
+Since this is a prototype, implement it as a single React app with Supabase as the backend/database (use it for transactions, accounts, alerts, cases, scenarios, feedback tables). Seed the database with realistic synthetic data only — no real personal or financial data. Build a seed script/edge function that generates:
 ~150–300 synthetic accounts and ~1,000+ synthetic transactions
 Several embedded fraud patterns: mule chains, fan-in, fan-out, circular transfers, rapid layering, dormant-account synchronized activation, and normal/legitimate high-value transactions
 Fields per transaction: transaction_id, sender_id, receiver_id, amount, timestamp, transaction_type (UPI/bank/wallet), device_id, location_id, account_age_days, scenario_id, label (normal/suspicious)
@@ -83,16 +83,6 @@ AI Investigation Assistant (LLM-backed, case-grounded)
 Detection Lab / Adversarial Simulator with at least one working scenario run
 Reports export + visual polish pass
 Build this as a cohesive, believably "real" investigation product — not a wireframe. Prioritize the graph screen, Detection Lab, and AI assistant as the three moments that should feel the most polished, since they're the core differentiators.
-
-This project was built with [Lovable](https://lovable.dev).
-
-## Build with Lovable
-
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/c4c70c23-6013-496d-a9a2-3b2d29778b0d).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
 
 ## Development
 
