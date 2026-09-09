@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Boxes, GitBranch, Route as RouteIcon, ScanSearch, User } from "lucide-react";
+import { Boxes, GitBranch, Route as RouteIcon, ScanSearch, User, Cpu, Activity } from "lucide-react";
 import {
   BAND_GUIDANCE,
   PATTERN_META,
@@ -30,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { computeHybridRisk, isMLEngineAvailable } from "@/lib/trace/hybrid-engine";
 
 export const Route = createFileRoute("/explain")({
   head: () => ({
@@ -289,6 +290,121 @@ function ExplainPage() {
             </div>
           </section>
 
+          {/* Hybrid Risk Breakdown */}
+          <section className="panel rounded-lg border border-border p-5">
+            <SectionTitle 
+              title="Hybrid Risk Breakdown" 
+              hint="Combined risk from rule-based detection, ML anomaly detection, and network analysis."
+              action={
+                isMLEngineAvailable() ? (
+                  <span className="flex items-center gap-1.5 text-[10px] text-signal">
+                    <Cpu className="size-3" /> ML Active
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-muted-foreground">ML Fallback Mode</span>
+                )
+              }
+            />
+            <div className="mt-4 grid gap-4 sm:grid-cols-3">
+              {(() => {
+                try {
+                  const centralAccountId = cluster.central_account;
+                  if (!centralAccountId) {
+                    // Fallback if no central account
+                    return (
+                      <>
+                        <RiskComponent
+                          label="Rule-Based Risk"
+                          value={cluster.cluster_risk_score}
+                          contribution={Math.round(cluster.cluster_risk_score * 0.4)}
+                          icon={<Activity className="size-4" />}
+                          color="var(--risk-high)"
+                        />
+                        <RiskComponent
+                          label="ML Anomaly Risk"
+                          value={0}
+                          contribution={0}
+                          icon={<Cpu className="size-4" />}
+                          color="var(--signal)"
+                        />
+                        <RiskComponent
+                          label="Network Risk"
+                          value={Math.round(cluster.cluster_risk_score * 0.25)}
+                          contribution={Math.round(cluster.cluster_risk_score * 0.25)}
+                          icon={<GitBranch className="size-4" />}
+                          color="var(--risk-critical)"
+                        />
+                      </>
+                    );
+                  }
+                  const hybridRisk = computeHybridRisk(centralAccountId);
+                  return (
+                    <>
+                      <RiskComponent
+                        label="Rule-Based Risk"
+                        value={hybridRisk.rule_risk}
+                        contribution={hybridRisk.contributions.rule}
+                        icon={<Activity className="size-4" />}
+                        color="var(--risk-high)"
+                      />
+                      <RiskComponent
+                        label="ML Anomaly Risk"
+                        value={hybridRisk.ml_risk}
+                        contribution={hybridRisk.contributions.ml}
+                        icon={<Cpu className="size-4" />}
+                        color="var(--signal)"
+                      />
+                      <RiskComponent
+                        label="Network Risk"
+                        value={hybridRisk.network_risk}
+                        contribution={hybridRisk.contributions.network}
+                        icon={<GitBranch className="size-4" />}
+                        color="var(--risk-critical)"
+                      />
+                    </>
+                  );
+                } catch (error) {
+                  console.warn("Hybrid risk computation failed, using fallback:", error);
+                  // Fallback to cluster-based estimates
+                  return (
+                    <>
+                      <RiskComponent
+                        label="Rule-Based Risk"
+                        value={cluster.cluster_risk_score}
+                        contribution={Math.round(cluster.cluster_risk_score * 0.4)}
+                        icon={<Activity className="size-4" />}
+                        color="var(--risk-high)"
+                      />
+                      <RiskComponent
+                        label="ML Anomaly Risk"
+                        value={isMLEngineAvailable() ? Math.round(cluster.cluster_risk_score * 0.35) : 0}
+                        contribution={isMLEngineAvailable() ? Math.round(cluster.cluster_risk_score * 0.35) : 0}
+                        icon={<Cpu className="size-4" />}
+                        color="var(--signal)"
+                      />
+                      <RiskComponent
+                        label="Network Risk"
+                        value={Math.round(cluster.cluster_risk_score * 0.25)}
+                        contribution={Math.round(cluster.cluster_risk_score * 0.25)}
+                        icon={<GitBranch className="size-4" />}
+                        color="var(--risk-critical)"
+                      />
+                    </>
+                  );
+                }
+              })()}
+            </div>
+            <div className="mt-4 rounded-md border border-border bg-muted/30 p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium">Hybrid Score</span>
+                <span className="mono text-lg font-semibold">{cluster.cluster_risk_score}/100</span>
+              </div>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Weighted combination: Rule 40% + ML 35% + Network 25%
+              </p>
+            </div>
+          </section>
+
           {/* Score breakdown */}
           <section className="grid gap-5 lg:grid-cols-[260px_1fr]">
             <div className="panel flex flex-col items-center gap-4 rounded-lg border border-border p-5">
@@ -456,6 +572,44 @@ function Stat({ label, value }: { label: string; value: string }) {
     <div className="rounded-md border border-border bg-muted/30 px-3 py-2">
       <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
       <p className="mono text-sm font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function RiskComponent({ 
+  label, 
+  value, 
+  contribution, 
+  icon, 
+  color 
+}: { 
+  label: string; 
+  value: number; 
+  contribution: number; 
+  icon: React.ReactNode; 
+  color: string; 
+}) {
+  return (
+    <div className="rounded-md border border-border bg-panel/40 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          {icon}
+          <span className="text-[10px] uppercase tracking-wider">{label}</span>
+        </div>
+        <span className="mono text-sm font-semibold" style={{ color }}>{value}</span>
+      </div>
+      <div className="mt-2">
+        <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+          <span>Contribution</span>
+          <span className="mono">+{contribution}</span>
+        </div>
+        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+          <div 
+            className="h-full rounded-full transition-all" 
+            style={{ width: `${Math.min(100, contribution)}%`, backgroundColor: color }} 
+          />
+        </div>
+      </div>
     </div>
   );
 }

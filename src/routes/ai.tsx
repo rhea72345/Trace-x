@@ -7,6 +7,7 @@ import {
   Route as RouteIcon,
   Sparkles,
   User,
+  Cpu,
 } from "lucide-react";
 import {
   BAND_GUIDANCE,
@@ -26,6 +27,7 @@ import { useTrace } from "@/lib/trace/context";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { processAIQuery, initializeAIAssistant, getLLMStatus, type AIResponse } from "@/lib/trace/ai-assistant";
 
 export const Route = createFileRoute("/ai")({
   head: () => ({
@@ -60,8 +62,10 @@ interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   text: string;
-  citations?: Citation[];
+  citations?: string[];
   at: string;
+  used_llm?: boolean;
+  confidence?: number;
 }
 
 /* ------------------------------------------------------------------ */
@@ -274,57 +278,58 @@ const QUICK_PROMPTS = [
   "Summarise the alert queue",
 ];
 
-function CitationChips({ citations }: { citations: Citation[] }) {
+function CitationChips({ citations }: { citations: string[] }) {
   const { setActiveNetworkId } = useTrace();
   const navigate = useNavigate();
   if (citations.length === 0) return null;
   return (
     <div className="mt-2 flex flex-wrap items-center gap-1.5">
       <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Evidence</span>
-      {citations.map((c, i) => {
-        if (c.kind === "account") {
+      {citations.map((id, i) => {
+        // Determine type based on ID prefix
+        if (id.startsWith("ACC-")) {
           return (
             <Link
-              key={`${c.kind}-${c.id}-${i}`}
+              key={`${id}-${i}`}
               to="/accounts/$accountId"
-              params={{ accountId: c.id }}
+              params={{ accountId: id }}
               className="mono rounded border border-signal/30 bg-signal/10 px-1.5 py-0.5 text-[10px] text-signal hover:underline"
             >
-              {c.id}
+              {id}
             </Link>
           );
         }
-        if (c.kind === "cluster") {
+        if (id.startsWith("NET-")) {
           return (
             <button
-              key={`${c.kind}-${c.id}-${i}`}
+              key={`${id}-${i}`}
               onClick={() => {
-                setActiveNetworkId(c.id);
+                setActiveNetworkId(id);
                 void navigate({ to: "/network" });
               }}
               className="mono rounded border border-signal/30 bg-signal/10 px-1.5 py-0.5 text-[10px] text-signal hover:underline"
             >
-              {c.id}
+              {id}
             </button>
           );
         }
-        if (c.kind === "alert") {
+        if (id.startsWith("ALR-")) {
           return (
             <Link
-              key={`${c.kind}-${c.id}-${i}`}
+              key={`${id}-${i}`}
               to="/alerts"
               className="mono rounded border border-border bg-muted/40 px-1.5 py-0.5 text-[10px] text-muted-foreground hover:underline"
             >
-              {c.id}
+              {id}
             </Link>
           );
         }
         return (
           <span
-            key={`${c.kind}-${c.id}-${i}`}
+            key={`${id}-${i}`}
             className="mono rounded border border-border bg-muted/40 px-1.5 py-0.5 text-[10px] text-muted-foreground"
           >
-            {c.id}
+            {id}
           </span>
         );
       })}
@@ -345,31 +350,59 @@ function AIInvestigationPage() {
   ]);
   const [input, setInput] = useState("");
   const [thinking, setThinking] = useState(false);
+  const [llmStatus, setLlmStatus] = useState(getLLMStatus());
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Initialize AI assistant on mount
+  useEffect(() => {
+    initializeAIAssistant().then(() => {
+      setLlmStatus(getLLMStatus());
+    });
+  }, []);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, thinking]);
 
-  const send = (text: string) => {
+  const send = async (text: string) => {
     const query = text.trim();
     if (!query || thinking) return;
     const userMsg: ChatMessage = { id: crypto.randomUUID(), role: "user", text: query, at: new Date().toISOString() };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setThinking(true);
-    window.setTimeout(() => {
+    
+    try {
+      // Try AI assistant with LLM support
+      const aiResponse: AIResponse = await processAIQuery(query, activeNetworkId);
+      
+      const assistantMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        text: aiResponse.text,
+        citations: aiResponse.citations,
+        at: new Date().toISOString(),
+        used_llm: aiResponse.used_llm,
+        confidence: aiResponse.confidence,
+      };
+      setMessages((prev) => [...prev, assistantMsg]);
+    } catch (error) {
+      // Fallback to deterministic engine
+      console.warn("AI query failed, using deterministic fallback:", error);
       const result = answerQuery(query, activeNetworkId);
       const assistantMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: "assistant",
         text: result.text,
-        citations: result.citations,
+        citations: result.citations.map(c => c.id),
         at: new Date().toISOString(),
+        used_llm: false,
+        confidence: 0.6,
       };
       setMessages((prev) => [...prev, assistantMsg]);
-      setThinking(false);
-    }, 420);
+    }
+    
+    setThinking(false);
   };
 
   const recentClusters = useMemo(
@@ -383,8 +416,18 @@ function AIInvestigationPage() {
         <div className="grid-surface pointer-events-none absolute inset-0 opacity-30" />
         <div className="relative">
           <p className="mono text-[10px] uppercase tracking-[0.28em] text-signal">Explain / assisted reasoning</p>
-          <h1 className="mt-1 flex items-center gap-2 text-2xl font-semibold tracking-tight"><Bot className="size-6 text-signal" /> AI Investigation</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">Ask focused questions about networks, transactions and evidence without leaving the investigation cockpit.</p>
+          <h1 className="mt-1 flex items-center gap-2 text-2xl font-semibold tracking-tight">
+            <Bot className="size-6 text-signal" /> AI Investigation
+            {llmStatus.available && (
+              <span className="flex items-center gap-1.5 rounded-full border border-signal/30 bg-signal/10 px-2.5 py-1 text-[10px] text-signal">
+                <Cpu className="size-3" /> Local LLM Active
+              </span>
+            )}
+          </h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            Ask focused questions about networks, transactions and evidence without leaving the investigation cockpit.
+            {llmStatus.available ? " Powered by local LLM with deterministic fallback." : " Using deterministic analysis engine."}
+          </p>
         </div>
       </header>
 
@@ -406,9 +449,19 @@ function AIInvestigationPage() {
                     {m.role === "assistant" ? <Bot className="size-3.5" /> : <User className="size-3.5" />}
                   </div>
                   <div className={cn("max-w-[85%] rounded-lg border px-3 py-2", m.role === "assistant" ? "border-border bg-panel/50" : "border-signal/30 bg-signal/10")}>
-                    <p className="text-xs leading-relaxed">{m.text}</p>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-xs leading-relaxed">{m.text}</p>
+                      {m.used_llm && (
+                        <Cpu className="size-3 shrink-0 text-signal" title="Generated by local LLM" />
+                      )}
+                    </div>
                     {m.citations && <CitationChips citations={m.citations} />}
-                    <p className="mt-1.5 text-[10px] text-muted-foreground">{relative(m.at)}</p>
+                    <div className="mt-1.5 flex items-center justify-between">
+                      <p className="text-[10px] text-muted-foreground">{relative(m.at)}</p>
+                      {m.confidence !== undefined && (
+                        <p className="text-[10px] text-muted-foreground">Confidence: {Math.round(m.confidence * 100)}%</p>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}

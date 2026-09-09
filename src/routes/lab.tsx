@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { FlaskConical, ShieldAlert, Sparkles } from "lucide-react";
+import { FlaskConical, ShieldAlert, Sparkles, Cpu, Activity, GitBranch } from "lucide-react";
 import {
   PATTERN_META,
   bandOf,
@@ -13,6 +13,7 @@ import { Meter, Mono, RiskBadge, ScoreRing, SectionTitle } from "@/components/tr
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
+import { isMLEngineAvailable } from "@/lib/trace/hybrid-engine";
 
 export const Route = createFileRoute("/lab")({
   head: () => ({
@@ -44,6 +45,11 @@ interface Run {
   detected: boolean;
   gap: boolean;
   signals: { label: string; score: number }[];
+  hybrid_contributions: {
+    rule: number;
+    ml: number;
+    network: number;
+  };
 }
 
 const SCENARIO_PATTERNS = Object.keys(PATTERN_META).filter(
@@ -56,12 +62,22 @@ function simulate(seed: number, generation: number, evasion: number, volume: num
   const base = 45 + rand() * 45 + volume * 0.15;
   const score = clamp(Math.round(base - evasion * 0.42 - generation * 1.6));
   const detected = score >= 60;
+  
+  // Hybrid risk contributions
+  const ruleRisk = clamp(Math.round(score * 0.4 + (rand() - 0.5) * 10));
+  const mlRisk = isMLEngineAvailable() 
+    ? clamp(Math.round(score * 0.35 + (rand() - 0.5) * 15 - evasion * 0.3))
+    : clamp(Math.round(score * 0.2)); // Fallback when ML unavailable
+  const networkRisk = clamp(Math.round(score * 0.25 + (rand() - 0.5) * 12));
+  
   const signals = [
     { label: "Velocity", score: clamp(Math.round(score + (rand() - 0.5) * 24)) },
     { label: "Network shape", score: clamp(Math.round(score + (rand() - 0.5) * 30)) },
     { label: "Counterparty spread", score: clamp(Math.round(score + (rand() - 0.5) * 26)) },
     { label: "Behaviour deviation", score: clamp(Math.round(score + (rand() - 0.5) * 20)) },
+    { label: "ML anomaly", score: mlRisk },
   ];
+  
   return {
     id: seed,
     generation,
@@ -71,6 +87,11 @@ function simulate(seed: number, generation: number, evasion: number, volume: num
     detected,
     gap: !detected,
     signals,
+    hybrid_contributions: {
+      rule: ruleRisk,
+      ml: mlRisk,
+      network: networkRisk,
+    },
   };
 }
 
@@ -154,6 +175,11 @@ function LabPage() {
             <p className="text-[11px] text-muted-foreground">
               {summary.detected} detected · {summary.gaps} missed across {runs.length || 0} simulated scenarios.
             </p>
+            {isMLEngineAvailable() && (
+              <div className="mt-2 flex items-center gap-1.5 text-[10px] text-signal">
+                <Cpu className="size-3" /> ML anomaly detection active
+              </div>
+            )}
           </div>
         </div>
 
@@ -202,12 +228,54 @@ function LabPage() {
                       <Meter key={s.label} label={s.label} value={s.score} tone="risk" />
                     ))}
                   </div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                    <HybridContribution
+                      label="Rule"
+                      value={r.hybrid_contributions.rule}
+                      icon={<Activity className="size-3" />}
+                      color="var(--risk-high)"
+                    />
+                    <HybridContribution
+                      label="ML"
+                      value={r.hybrid_contributions.ml}
+                      icon={<Cpu className="size-3" />}
+                      color="var(--signal)"
+                    />
+                    <HybridContribution
+                      label="Network"
+                      value={r.hybrid_contributions.network}
+                      icon={<GitBranch className="size-3" />}
+                      color="var(--risk-critical)"
+                    />
+                  </div>
                 </li>
               ))}
             </ul>
           )}
         </div>
       </section>
+    </div>
+  );
+}
+
+function HybridContribution({ 
+  label, 
+  value, 
+  icon, 
+  color 
+}: { 
+  label: string; 
+  value: number; 
+  icon: React.ReactNode; 
+  color: string; 
+}) {
+  return (
+    <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-2 py-1.5">
+      {icon}
+      <div className="flex-1">
+        <div className="text-[10px] text-muted-foreground">{label}</div>
+        <div className="mono text-xs font-semibold" style={{ color }}>{value}</div>
+      </div>
     </div>
   );
 }

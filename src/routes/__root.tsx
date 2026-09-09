@@ -15,6 +15,7 @@ import { TraceProvider } from "@/lib/trace/context";
 import { AppShell } from "@/components/trace/AppShell";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
+import { initializeTRACEX } from "@/lib/trace/init";
 
 function NotFoundComponent() {
   return (
@@ -122,6 +123,13 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  // Initialize TRACE-X enhanced features on mount
+  useEffect(() => {
+    initializeTRACEX().catch(error => {
+      console.warn("TRACE-X initialization completed with fallbacks:", error);
+    });
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

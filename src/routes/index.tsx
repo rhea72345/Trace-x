@@ -291,13 +291,20 @@ function SeverityCard({
 }) {
   const color = `text-risk-${tone}`;
   return (
-    <div className="panel-surface relative overflow-hidden rounded-lg p-4">
+    <div className="panel-surface relative overflow-hidden rounded-lg p-4 transition-all hover:shadow-lg hover:shadow-risk-${tone}/10">
       <div className={`absolute inset-x-0 top-0 h-0.5 bg-risk-${tone}`} />
-      <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{label} alerts</p>
-      <p className={`mono mt-1.5 text-3xl font-semibold ${color}`}>
-        <CountUp value={count} />
-      </p>
-      <p className="mt-1 text-[11px] text-muted-foreground">{hint}</p>
+      <div className="relative">
+        <div className="flex items-start justify-between">
+          <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{label} alerts</p>
+          <div className={`size-8 rounded-lg bg-risk-${tone}/10 flex items-center justify-center`}>
+            <ShieldAlert className={`size-4 ${color}`} />
+          </div>
+        </div>
+        <p className={`mono mt-2 text-3xl font-semibold ${color}`}>
+          <CountUp value={count} />
+        </p>
+        <p className="mt-1 text-[11px] text-muted-foreground">{hint}</p>
+      </div>
     </div>
   );
 }
