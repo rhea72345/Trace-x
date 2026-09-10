@@ -51,6 +51,53 @@ export interface TraceCase {
 const LOCAL_CASES_KEY = "trace.demo.cases";
 const BACKEND_TIMEOUT_MS = 5000; // Increased to 5 seconds to give more time for network requests
 
+// Fixed demo case IDs for deterministic fallback
+const DEMO_CASE_IDS = [
+  "demo-case-001",
+  "demo-case-002", 
+  "demo-case-003",
+  "demo-case-004",
+  "demo-case-005"
+];
+
+// Initialize demo cases if localStorage is empty
+function initializeDemoCasesIfEmpty() {
+  if (typeof window === "undefined") return;
+  try {
+    const stored = window.localStorage.getItem(LOCAL_CASES_KEY);
+    if (stored) return; // Already has data
+    
+    // Create deterministic demo cases from existing clusters
+    const demoCases: TraceCase[] = [];
+    const clusters = db.clusters.slice(0, 5); // Use first 5 clusters
+    
+    clusters.forEach((cluster, index) => {
+      const evidence = buildEvidence(cluster.id, null);
+      const demoCase: TraceCase = {
+        id: DEMO_CASE_IDS[index],
+        alert_id: null,
+        network_id: cluster.id,
+        title: `${cluster.name} investigation`,
+        status: "Open",
+        decision: null,
+        notes: null,
+        risk_score: cluster.cluster_risk_score,
+        pattern_tags: cluster.pattern_tags,
+        attached_evidence: evidence,
+        ai_summary: null,
+        created_at: new Date(Date.now() - index * 86400000).toISOString(), // Staggered timestamps
+        updated_at: new Date(Date.now() - index * 43200000).toISOString(),
+      };
+      demoCases.push(demoCase);
+    });
+    
+    writeLocalCases(demoCases);
+    console.log("Initialized demo cases with deterministic IDs:", demoCases.map(c => c.id));
+  } catch (error) {
+    console.warn("Failed to initialize demo cases:", error);
+  }
+}
+
 async function withTimeout<T>(request: PromiseLike<T>, timeoutMs: number = BACKEND_TIMEOUT_MS) {
   return Promise.race([
     request,
@@ -150,8 +197,13 @@ function localCaseFromNetwork(networkId: string, alertId: string | null) {
   const cluster = db.getCluster(networkId);
   if (!cluster) throw new Error("The selected network is no longer available.");
   const now = new Date().toISOString();
+  
+  // Generate deterministic ID based on network ID
+  const networkHash = networkId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const deterministicId = `demo-custom-${networkHash}`;
+  
   const item = normaliseCase({
-    id: `demo-${globalThis.crypto.randomUUID()}`,
+    id: deterministicId,
     alert_id: alertId,
     network_id: networkId,
     title: `${cluster.name} investigation`,
@@ -168,6 +220,9 @@ function localCaseFromNetwork(networkId: string, alertId: string | null) {
 }
 
 export async function listCases() {
+  // Initialize demo cases if empty
+  initializeDemoCasesIfEmpty();
+  
   try {
     const { data, error } = await withTimeout(supabase.from("cases").select("*").order("updated_at", { ascending: false }), 3000);
     if (error) throw error;
@@ -179,6 +234,9 @@ export async function listCases() {
 }
 
 export async function getCase(id: string) {
+  // Initialize demo cases if empty
+  initializeDemoCasesIfEmpty();
+  
   try {
     const { data, error } = await withTimeout(supabase.from("cases").select("*").eq("id", id).maybeSingle(), 3000);
     if (error) throw error;
