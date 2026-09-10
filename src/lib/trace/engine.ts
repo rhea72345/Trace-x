@@ -23,6 +23,64 @@ export type PatternType =
   | "bridge_account"
   | "legit_high_value";
 
+export type FraudTypology =
+  | "Structuring"
+  | "Mule account layering"
+  | "Circular transaction ring"
+  | "Smurfing"
+  | "Anomalous pattern";
+
+/**
+ * Classify a flagged account/cluster into a fraud typology based on existing signals.
+ * This maps existing detection patterns to named fraud typologies without adding new detection logic.
+ */
+export function classifyFraudTypology(cluster: NetworkCluster): FraudTypology {
+  const pattern = cluster.pattern;
+  const fp = cluster.fingerprint;
+  const signals = cluster.signals;
+  
+  // Map existing patterns to typologies based on signals and pattern metadata
+  switch (pattern) {
+    case "circular":
+      return "Circular transaction ring";
+    
+    case "mule_chain":
+    case "rapid_layering":
+      return "Mule account layering";
+    
+    case "fan_out":
+      // High fan-out with many small transactions suggests smurfing
+      if (fp.fan_out > 60 && fp.layering > 50) {
+        return "Smurfing";
+      }
+      return "Mule account layering";
+    
+    case "fan_in":
+      // Fan-in with just-under-threshold amounts suggests structuring
+      const structuringSignal = signals.find(s => s.key === "counterparties");
+      if (structuringSignal && structuringSignal.score > 50) {
+        return "Structuring";
+      }
+      return "Mule account layering";
+    
+    case "dormant_sync":
+      // Dormant accounts reactivating together often for structuring
+      if (fp.dormancy > 40) {
+        return "Structuring";
+      }
+      return "Anomalous pattern";
+    
+    case "bridge_account":
+      return "Mule account layering";
+    
+    case "legit_high_value":
+      return "Anomalous pattern";
+    
+    default:
+      return "Anomalous pattern";
+  }
+}
+
 export const PATTERN_META: Record<
   PatternType,
   { label: string; short: string; description: string; benign?: boolean }

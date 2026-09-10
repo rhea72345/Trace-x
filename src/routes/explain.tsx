@@ -8,6 +8,7 @@ import {
   db,
   type NetworkCluster,
   type SignalBreakdown,
+  classifyFraudTypology,
 } from "@/lib/trace/engine";
 import { compactCurrency, currency, dateTime } from "@/lib/trace/format";
 import {
@@ -19,6 +20,7 @@ import {
   RISK_CLASSES,
   ScoreRing,
   SectionTitle,
+  TypologyBadge,
 } from "@/components/trace/primitives";
 import { useTrace } from "@/lib/trace/context";
 import { cn } from "@/lib/utils";
@@ -261,6 +263,7 @@ function ExplainPage() {
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <PatternBadge pattern={cluster.pattern} />
               <RiskBadge score={cluster.cluster_risk_score} pulse />
+              <TypologyBadge typology={classifyFraudTypology(cluster)} />
               <span className="text-xs text-muted-foreground">{cluster.name}</span>
               {focusAccount && (
                 <span className="text-xs text-muted-foreground">

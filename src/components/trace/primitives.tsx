@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { BAND_GUIDANCE, PATTERN_META, bandOf, type PatternType, type RiskLevel } from "@/lib/trace/engine";
+import { BAND_GUIDANCE, PATTERN_META, bandOf, type PatternType, type RiskLevel, type FraudTypology } from "@/lib/trace/engine";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export const RISK_CLASSES: Record<RiskLevel, { text: string; bg: string; border: string; dot: string }> = {
@@ -89,6 +89,39 @@ export function PatternBadge({ pattern, size = "md" }: { pattern: PatternType; s
       <TooltipContent className="max-w-xs">
         <p className="font-medium">{meta.label}</p>
         <p className="text-muted-foreground">{meta.description}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+export function TypologyBadge({ typology, size = "md" }: { typology: FraudTypology; size?: "sm" | "md" }) {
+  const isAnomalous = typology === "Anomalous pattern";
+  const descriptions: Record<FraudTypology, string> = {
+    "Structuring": "Multiple transactions just under reporting thresholds",
+    "Mule account layering": "Rapid pass-through of funds through intermediary accounts",
+    "Circular transaction ring": "Funds cycle back to origin through intermediaries",
+    "Smurfing": "Funds split across many small transfers to avoid detection",
+    "Anomalous pattern": "Unusual activity not matching specific typology patterns",
+  };
+  
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className={cn(
+            "inline-flex items-center rounded border font-medium",
+            isAnomalous
+              ? "border-muted-foreground/30 bg-muted/40 text-muted-foreground"
+              : "border-signal/30 bg-signal/10 text-signal",
+            size === "sm" ? "px-1.5 py-0.5 text-[10px]" : "px-2 py-0.5 text-xs",
+          )}
+        >
+          {typology}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs">
+        <p className="font-medium">{typology}</p>
+        <p className="text-muted-foreground">{descriptions[typology]}</p>
       </TooltipContent>
     </Tooltip>
   );

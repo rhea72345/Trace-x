@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { BriefcaseBusiness, Filter, Search, Telescope } from "lucide-react";
-import { PATTERN_META, db, type PatternType, type RiskLevel } from "@/lib/trace/engine";
+import { PATTERN_META, db, type PatternType, type RiskLevel, classifyFraudTypology } from "@/lib/trace/engine";
 import { compactCurrency, dateTime, relative } from "@/lib/trace/format";
-import { EmptyState, PatternBadge, RiskBadge, StatusPill } from "@/components/trace/primitives";
+import { EmptyState, PatternBadge, RiskBadge, StatusPill, TypologyBadge } from "@/components/trace/primitives";
 import { useTrace } from "@/lib/trace/context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -189,6 +189,7 @@ function Alerts() {
                 <th className="px-3 py-2 font-medium">Alert</th>
                 <th className="px-3 py-2 font-medium">Risk</th>
                 <th className="px-3 py-2 font-medium">Patterns</th>
+                <th className="px-3 py-2 font-medium">Typology</th>
                 <th className="px-3 py-2 font-medium">Accounts</th>
                 <th className="px-3 py-2 text-right font-medium">Value</th>
                 <th className="px-3 py-2 font-medium">Status</th>
@@ -197,46 +198,53 @@ function Alerts() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((a) => (
-                <tr key={a.id} className="border-b border-border/50 transition-colors last:border-0 hover:bg-accent/40">
-                  <td className="px-3 py-2.5">
-                    <p className="mono text-[11px] text-muted-foreground">{a.id}</p>
-                    <p className="text-[13px] font-medium">{a.title}</p>
-                    <p className="mono text-[10px] text-muted-foreground">
-                      {a.network_id} · central {a.primary_account}
-                    </p>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <RiskBadge score={a.risk_score} pulse />
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <div className="flex flex-wrap gap-1">
-                      {a.pattern_tags.map((p) => (
-                        <PatternBadge key={p} pattern={p} size="sm" />
-                      ))}
-                    </div>
-                  </td>
-                  <td className="mono px-3 py-2.5 text-xs">{a.accounts_involved}</td>
-                  <td className="mono px-3 py-2.5 text-right text-xs">{compactCurrency(a.amount)}</td>
-                  <td className="px-3 py-2.5">
-                    <StatusPill status={a.status} />
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <p className="text-xs">{relative(a.created_at)}</p>
-                    <p className="mono text-[10px] text-muted-foreground">{dateTime(a.created_at)}</p>
-                  </td>
-                  <td className="px-3 py-2.5 text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button size="sm" variant="outline" className="gap-1.5" onClick={() => investigate(a.network_id)}>
-                        <Telescope className="size-3.5" /> Investigate
-                      </Button>
-                      <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => void createCase(a.id, a.network_id)}>
-                        <BriefcaseBusiness className="size-3.5" /> Case
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {rows.map((a) => {
+                const cluster = db.getCluster(a.network_id);
+                const typology = cluster ? classifyFraudTypology(cluster) : "Anomalous pattern";
+                return (
+                  <tr key={a.id} className="border-b border-border/50 transition-colors last:border-0 hover:bg-accent/40">
+                    <td className="px-3 py-2.5">
+                      <p className="mono text-[11px] text-muted-foreground">{a.id}</p>
+                      <p className="text-[13px] font-medium">{a.title}</p>
+                      <p className="mono text-[10px] text-muted-foreground">
+                        {a.network_id} · central {a.primary_account}
+                      </p>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <RiskBadge score={a.risk_score} pulse />
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <div className="flex flex-wrap gap-1">
+                        {a.pattern_tags.map((p) => (
+                          <PatternBadge key={p} pattern={p} size="sm" />
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <TypologyBadge typology={typology} size="sm" />
+                    </td>
+                    <td className="mono px-3 py-2.5 text-xs">{a.accounts_involved}</td>
+                    <td className="mono px-3 py-2.5 text-right text-xs">{compactCurrency(a.amount)}</td>
+                    <td className="px-3 py-2.5">
+                      <StatusPill status={a.status} />
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <p className="text-xs">{relative(a.created_at)}</p>
+                      <p className="mono text-[10px] text-muted-foreground">{dateTime(a.created_at)}</p>
+                    </td>
+                    <td className="px-3 py-2.5 text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button size="sm" variant="outline" className="gap-1.5" onClick={() => investigate(a.network_id)}>
+                          <Telescope className="size-3.5" /> Investigate
+                        </Button>
+                        <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => void createCase(a.id, a.network_id)}>
+                          <BriefcaseBusiness className="size-3.5" /> Case
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

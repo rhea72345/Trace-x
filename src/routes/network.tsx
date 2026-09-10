@@ -10,9 +10,10 @@ import {
   type PatternType,
   type RiskLevel,
   type Transaction,
+  classifyFraudTypology,
 } from "@/lib/trace/engine";
 import { compactCurrency, dateTime } from "@/lib/trace/format";
-import { Meter, Mono, PatternBadge, RiskBadge, ScoreRing, SectionTitle } from "@/components/trace/primitives";
+import { Meter, Mono, PatternBadge, RiskBadge, ScoreRing, SectionTitle, TypologyBadge } from "@/components/trace/primitives";
 import { NetworkGraph } from "@/components/trace/NetworkGraph";
 import { ConnectionsList, useAccountConnections } from "@/components/trace/ConnectionsList";
 import { useTrace } from "@/lib/trace/context";
@@ -200,6 +201,7 @@ function NetworkPage() {
               {cluster.pattern_tags.map((p) => (
                 <PatternBadge key={p} pattern={p} size="sm" />
               ))}
+              <TypologyBadge typology={classifyFraudTypology(cluster)} size="sm" />
             </div>
             <p className="mt-3 max-w-2xl text-sm text-muted-foreground">{cluster.narrative}</p>
           </div>
