@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowDownUp, Search, Users } from "lucide-react";
 import { db, type RiskLevel } from "@/lib/trace/engine";
@@ -6,6 +6,7 @@ import { compactCurrency } from "@/lib/trace/format";
 import { EmptyState, Mono, RiskBadge, StatusPill } from "@/components/trace/primitives";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/accounts")({
   head: () => ({
@@ -32,6 +33,13 @@ function AccountsPage() {
   const [level, setLevel] = useState<RiskLevel | "All">("All");
   const [sortKey, setSortKey] = useState<SortKey>("risk");
   const [descending, setDescending] = useState(true);
+  const [loading, setLoading] = useState(true);
+
+  // Simulate brief loading to show skeleton and avoid blank table
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 300);
+    return () => clearTimeout(timer);
+  }, []);
 
   const rows = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -93,7 +101,34 @@ function AccountsPage() {
         </div>
       </section>
 
-      {rows.length === 0 ? (
+      {loading ? (
+        <div className="panel-surface overflow-hidden rounded-lg">
+          <div className="max-h-[640px] overflow-auto">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 z-10 bg-card text-left text-[10px] uppercase tracking-wider text-muted-foreground">
+                <tr className="border-b border-border">
+                  <th className="px-3 py-2 font-medium">Account</th>
+                  <th className="px-3 py-2 font-medium">Holder</th>
+                  <th className="px-3 py-2 font-medium">Role</th>
+                  <th className="px-3 py-2 font-medium">Status</th>
+                  <th className="px-3 py-2 text-right font-medium">Risk</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <tr key={i} className="border-b border-border/50">
+                    <td className="px-3 py-2.5"><Skeleton className="h-4 w-20" /></td>
+                    <td className="px-3 py-2.5"><Skeleton className="h-4 w-32" /></td>
+                    <td className="px-3 py-2.5"><Skeleton className="h-4 w-24" /></td>
+                    <td className="px-3 py-2.5"><Skeleton className="h-4 w-20" /></td>
+                    <td className="px-3 py-2.5 text-right"><Skeleton className="h-4 w-12 ml-auto" /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : rows.length === 0 ? (
         <EmptyState icon={<Users className="size-8" />} title="No accounts match" description="Try a different search term or risk level." />
       ) : (
         <div className="panel-surface overflow-hidden rounded-lg">

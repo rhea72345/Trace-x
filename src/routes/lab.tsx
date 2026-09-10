@@ -1,6 +1,19 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { FlaskConical, ShieldAlert, Sparkles, Cpu, Activity, GitBranch } from "lucide-react";
+import { FlaskConical, ShieldAlert, Sparkles, Cpu, Activity, GitBranch, TrendingUp, Trophy } from "lucide-react";
+import {
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+} from "recharts";
 import {
   PATTERN_META,
   bandOf,
@@ -124,6 +137,46 @@ function LabPage() {
       rate: runs.length ? Math.round((detected / runs.length) * 100) : stats.recall,
     };
   }, [runs, stats.recall]);
+
+  // Performance data across generations
+  const performanceData = useMemo(() => {
+    const generations = [...new Set(runs.map(r => r.generation))].sort((a, b) => a - b);
+    return generations.map(gen => {
+      const genRuns = runs.filter(r => r.generation === gen);
+      const detected = genRuns.filter(r => r.detected).length;
+      const gaps = genRuns.length - detected;
+      return {
+        generation: `Gen ${gen}`,
+        detectionRate: genRuns.length ? Math.round((detected / genRuns.length) * 100) : 0,
+        detected,
+        gaps,
+        total: genRuns.length,
+      };
+    });
+  }, [runs]);
+
+  // Detection gap trend data
+  const gapTrendData = useMemo(() => {
+    const generations = [...new Set(runs.map(r => r.generation))].sort((a, b) => a - b);
+    return generations.map(gen => {
+      const genRuns = runs.filter(r => r.generation === gen);
+      const detected = genRuns.filter(r => r.detected).length;
+      const gaps = genRuns.length - detected;
+      return {
+        generation: `Gen ${gen}`,
+        detected,
+        gaps,
+      };
+    });
+  }, [runs]);
+
+  // Hardest scenarios leaderboard (lowest scores that were still detected)
+  const hardestScenarios = useMemo(() => {
+    return runs
+      .filter(r => r.detected) // Only detected scenarios
+      .sort((a, b) => a.score - b.score) // Lowest scores first (hardest to detect)
+      .slice(0, 5);
+  }, [runs]);
 
   return (
     <div className="space-y-5">
@@ -254,6 +307,159 @@ function LabPage() {
           )}
         </div>
       </section>
+
+      {/* Performance Visualizations */}
+      {runs.length > 0 && (
+        <section className="grid gap-4 xl:grid-cols-3">
+          {/* Performance Chart */}
+          <div className="panel-surface rounded-lg p-4 xl:col-span-2">
+            <SectionTitle 
+              title="Detection performance across generations" 
+              hint="Track how detection rates change as adversaries evolve."
+            />
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={performanceData}>
+                  <defs>
+                    <linearGradient id="colorDetected" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--risk-low)" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="var(--risk-low)" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorGaps" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--risk-critical)" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="var(--risk-critical)" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis 
+                    dataKey="generation" 
+                    tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis 
+                    tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: "var(--popover)",
+                      border: "1px solid var(--border-strong)",
+                      borderRadius: 8,
+                      fontSize: 12,
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="detected"
+                    stackId="1"
+                    stroke="var(--risk-low)"
+                    fillOpacity={1}
+                    fill="url(#colorDetected)"
+                    name="Detected"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="gaps"
+                    stackId="1"
+                    stroke="var(--risk-critical)"
+                    fillOpacity={1}
+                    fill="url(#colorGaps)"
+                    name="Detection Gaps"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Hardest Scenario Leaderboard */}
+          <div className="panel-surface rounded-lg p-4">
+            <SectionTitle 
+              title="Hardest scenarios" 
+              hint="Scenarios that were detected but had the lowest scores (closest to the threshold)."
+              action={<Trophy className="size-4 text-signal" />}
+            />
+            {hardestScenarios.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border py-8 text-center">
+                <ShieldAlert className="size-6 text-muted-foreground/70" />
+                <p className="text-xs text-muted-foreground">Run more simulations to populate leaderboard</p>
+              </div>
+            ) : (
+              <div className="space-y-2 mt-3">
+                {hardestScenarios.map((r, i) => (
+                  <div
+                    key={`${r.id}-${r.generation}`}
+                    className="flex items-center justify-between gap-2 rounded-md border border-border bg-card/60 px-3 py-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="mono text-lg font-bold text-muted-foreground">#{i + 1}</span>
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-medium">{r.label}</p>
+                        <p className="mono text-[10px] text-muted-foreground">Score: {r.score}</p>
+                      </div>
+                    </div>
+                    <RiskBadge score={r.score} size="sm" />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Detection Gap Trend Chart */}
+      {runs.length > 0 && (
+        <section className="panel-surface rounded-lg p-4">
+          <SectionTitle 
+            title="Detected vs Detection Gap trend" 
+            hint="Track the balance between successful detections and missed scenarios over generations."
+            action={<TrendingUp className="size-4 text-signal" />}
+          />
+          <div className="h-[250px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={gapTrendData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis 
+                  dataKey="generation" 
+                  tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis 
+                  tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: "var(--popover)",
+                    border: "1px solid var(--border-strong)",
+                    borderRadius: 8,
+                    fontSize: 12,
+                  }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="detected"
+                  stroke="var(--risk-low)"
+                  strokeWidth={2}
+                  dot={{ fill: "var(--risk-low)", strokeWidth: 2, r: 4 }}
+                  name="Detected"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="gaps"
+                  stroke="var(--risk-critical)"
+                  strokeWidth={2}
+                  dot={{ fill: "var(--risk-critical)", strokeWidth: 2, r: 4 }}
+                  name="Detection Gaps"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

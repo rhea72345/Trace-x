@@ -49,13 +49,13 @@ export interface TraceCase {
 }
 
 const LOCAL_CASES_KEY = "trace.demo.cases";
-const BACKEND_TIMEOUT_MS = 1800;
+const BACKEND_TIMEOUT_MS = 5000; // Increased to 5 seconds to give more time for network requests
 
-async function withTimeout<T>(request: PromiseLike<T>) {
+async function withTimeout<T>(request: PromiseLike<T>, timeoutMs: number = BACKEND_TIMEOUT_MS) {
   return Promise.race([
     request,
     new Promise<never>((_, reject) => {
-      window.setTimeout(() => reject(new Error("Backend unavailable in prototype preview")), BACKEND_TIMEOUT_MS);
+      window.setTimeout(() => reject(new Error("Backend unavailable in prototype preview")), timeoutMs);
     }),
   ]);
 }
@@ -169,20 +169,22 @@ function localCaseFromNetwork(networkId: string, alertId: string | null) {
 
 export async function listCases() {
   try {
-    const { data, error } = await withTimeout(supabase.from("cases").select("*").order("updated_at", { ascending: false }));
+    const { data, error } = await withTimeout(supabase.from("cases").select("*").order("updated_at", { ascending: false }), 3000);
     if (error) throw error;
     return (data ?? []).map((item) => normaliseCase(item));
-  } catch {
+  } catch (err) {
+    console.warn("Failed to fetch cases from backend, using local fallback:", err);
     return readLocalCases();
   }
 }
 
 export async function getCase(id: string) {
   try {
-    const { data, error } = await withTimeout(supabase.from("cases").select("*").eq("id", id).maybeSingle());
+    const { data, error } = await withTimeout(supabase.from("cases").select("*").eq("id", id).maybeSingle(), 3000);
     if (error) throw error;
     return data ? normaliseCase(data) : readLocalCases().find((item) => item.id === id) ?? null;
-  } catch {
+  } catch (err) {
+    console.warn(`Failed to fetch case ${id} from backend, using local fallback:`, err);
     return readLocalCases().find((item) => item.id === id) ?? null;
   }
 }
@@ -209,20 +211,22 @@ export async function createCaseFromNetwork(networkId: string, alertId: string |
     attached_evidence: evidence as unknown as Json,
   };
   try {
-    const { data, error } = await withTimeout(supabase.from("cases").insert(payload).select("*").single());
+    const { data, error } = await withTimeout(supabase.from("cases").insert(payload).select("*").single(), 5000);
     if (error) throw error;
     return normaliseCase(data);
-  } catch {
+  } catch (err) {
+    console.warn("Failed to create case in backend, using local fallback:", err);
     return localCaseFromNetwork(networkId, alertId);
   }
 }
 
 export async function updateCase(id: string, changes: { status?: CaseStatus; notes?: string | null; decision?: CaseDecision | null }) {
   try {
-    const { data, error } = await withTimeout(supabase.from("cases").update(changes).eq("id", id).select("*").single());
+    const { data, error } = await withTimeout(supabase.from("cases").update(changes).eq("id", id).select("*").single(), 3000);
     if (error) throw error;
     return normaliseCase(data);
-  } catch {
+  } catch (err) {
+    console.warn(`Failed to update case ${id} in backend, using local fallback:`, err);
     const cases = readLocalCases();
     const updated = cases.map((item) => (item.id === id ? normaliseCase({ ...item, ...changes, updated_at: new Date().toISOString() }) : item));
     writeLocalCases(updated);

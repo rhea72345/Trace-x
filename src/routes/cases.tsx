@@ -49,8 +49,14 @@ function CasesPage() {
 
   const reload = async () => {
     setLoading(true);
-    setCases(await listCases());
-    setLoading(false);
+    try {
+      setCases(await listCases());
+    } catch (error) {
+      console.error("Failed to load cases:", error);
+      // Don't set loading to false on error, let the user see the error state
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {

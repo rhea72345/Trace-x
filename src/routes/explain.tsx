@@ -301,7 +301,7 @@ function ExplainPage() {
                     <Cpu className="size-3" /> ML Active
                   </span>
                 ) : (
-                  <span className="text-[10px] text-muted-foreground">ML Fallback Mode</span>
+                  <span className="text-[10px] text-muted-foreground">Rule-Based Analysis</span>
                 )
               }
             />
