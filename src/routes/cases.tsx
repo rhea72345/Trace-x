@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { BriefcaseBusiness, ClipboardList, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,11 +41,17 @@ export const Route = createFileRoute("/cases")({
 function CasesPage() {
   const { activeNetworkId, activeAlertId } = useTrace();
   const navigate = useNavigate();
+  const location = useLocation();
   const [cases, setCases] = useState<TraceCase[]>([]);
   const [status, setStatus] = useState<CaseStatus | "All">("All");
   const [query, setQuery] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const isCaseDetailRoute = location.pathname !== "/cases";
+  if (isCaseDetailRoute) {
+    return <Outlet />;
+  }
 
   const reload = async () => {
     setLoading(true);
