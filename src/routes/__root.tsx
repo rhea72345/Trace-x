@@ -13,6 +13,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { TraceProvider } from "@/lib/trace/context";
 import { AppShell } from "@/components/trace/AppShell";
+import { JudgeModeOverlay } from "@/components/trace/JudgeModeOverlay";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { initializeTRACEX } from "@/lib/trace/init";
@@ -139,6 +140,7 @@ function RootComponent() {
             {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
             <Outlet />
           </AppShell>
+          <JudgeModeOverlay />
           <Toaster position="bottom-right" />
         </TraceProvider>
       </TooltipProvider>

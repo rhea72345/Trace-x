@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EmptyState, Mono, PatternBadge, RiskBadge, SectionTitle, StatusPill } from "@/components/trace/primitives";
+import { SarReportButton } from "@/components/trace/SarReportPreview";
+import { PrecedentMatches } from "@/components/trace/PrecedentMatches";
 import { addCaseFeedback, CASE_STATUSES, getCase, updateCase, type CaseDecision, type CaseStatus, type TraceCase } from "@/lib/trace/cases";
 import { db } from "@/lib/trace/engine";
 import { compactCurrency, dateTime } from "@/lib/trace/format";
@@ -93,6 +95,7 @@ function CaseDetailPage() {
                 <SelectContent>{CASE_STATUSES.map((status) => <SelectItem key={status} value={status}>{status}</SelectItem>)}</SelectContent>
               </Select>
             </label>
+            <SarReportButton traceCase={item} />
           </div>
         </div>
         <dl className="mt-5 grid gap-3 sm:grid-cols-4">
@@ -128,6 +131,7 @@ function CaseDetailPage() {
         </div>
 
         <aside className="space-y-4">
+          <PrecedentMatches traceCase={item} />
           <section className="panel-surface rounded-lg p-4">
             <SectionTitle title="Analyst decision" hint="Record the outcome in case feedback." />
             <div className="grid gap-2">
